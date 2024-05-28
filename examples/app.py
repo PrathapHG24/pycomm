@@ -2,28 +2,24 @@ from pycomm.ab_comm.clx import Driver as ClxDriver
 import logging
 from time import sleep
 from flask import Flask, request
-from flask_cors import CORS
 
 app = Flask(__name__)
-CORS(app)
 
 # Create a ClxDriver instance
 c = ClxDriver()
 
-def open_connection():
-    if not c.is_connected():  # Check if the connection is already open
-        c.open('192.168.12.5')  # Open connection to the PLC
-        print("Connection to PLC established.")
-
 @app.route('/insertDataToPlc', methods=['POST'])
 def insert_data_to_plc():
     try:
-        open_connection()  # Ensure the connection is open
+        if not c.is_connected():  # Check if the connection is already open
+            c.open('10.60.85.21')  # Open connection to the PLC
+            print("Connection to PLC established.")
+
         c.forward_open()  # Initialize the session
 
         # Get the JSON data from the request
         data_list = request.json
-
+        
         # Now iterate through the processed data and process it as before
         for item in data_list:
             for key, value in item.items():
@@ -32,7 +28,7 @@ def insert_data_to_plc():
                     value_type = 'REAL' if isinstance(value, float) else 'INT'
                     c.write_tag(key.encode('utf-8'), value, value_type)
                 else:
-                    print("Value is", value)
+                    print("Value is",value)
                     key = key.encode('utf-8')
                     value = value.encode('utf-8')
                     print(c.write_string(key, value))
@@ -42,8 +38,6 @@ def insert_data_to_plc():
         return "Data written to PLC successfully.", 200
     except Exception as e:
         print("Error:", e)
-        # Attempt to reopen the connection
-        open_connection()
         return "Error occurred while writing data to PLC.", 500
 
 @app.route('/closeConnection', methods=['GET'])
