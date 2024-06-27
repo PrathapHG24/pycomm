@@ -1,8 +1,9 @@
 from pycomm.ab_comm.clx import Driver as ClxDriver
+import logging
+from time import sleep
 from flask import Flask, request, jsonify
 from flask_cors import CORS, cross_origin
 import json
-import time
 
 app = Flask(__name__)
 CORS(app)
@@ -40,21 +41,13 @@ def insert_data_to_plc():
                 str_value = str_value.encode('utf-8')
                 write_operations.append((key, str_value))
 
-        # Measure time before writing starts
-        start_time = time.time()
-
         # Perform all write operations
         for key, str_value in write_operations:
             try:
                 c.write_string(key, str_value)
-                print("Data written to PLC successfully for key: {key}".format(key=key.decode('utf-8')))
+                print("Data written to PLC successfully for key: {key.decode('utf-8')}")
             except Exception as e:
-                print("Error writing string: {key}: {error}".format(key=key.decode('utf-8'), error=e))
-
-        # Measure time after all write operations complete
-        end_time = time.time()
-        time_taken = end_time - start_time
-        print("Time taken to write to PLC: {:.4f} seconds".format(time_taken))
+                print("Error writing string: {key.decode('utf-8')}: {e}")
 
         return jsonify({"message": "Data written to PLC successfully.", "error": None}), 200
     except Exception as e:
@@ -75,9 +68,9 @@ def close_connection():
         print("Connection to PLC closed.")
     return jsonify({"message": "Connection to PLC closed successfully.", "error": None}), 200
 
-@app.route('/readDataTagsFromPlc', methods=['GET'])
+@app.route('/readDataFromPlc', methods=['POST'])
 @cross_origin()
-def read_data_tags_from_plc():
+def read_data_from_plc():
     global is_connected  # Access the global flag
 
     try:
@@ -91,26 +84,19 @@ def read_data_tags_from_plc():
             print("Connection to PLC established.")
             is_connected = True
 
-        # Read all available tags from the PLC
-        tags_response = c.get_tag_list()
-        if tags_response is None:
-            raise Exception("Failed to get tag list from PLC.")
+        # Get the tag name from the request
+        tag_name = request.json.get('tag_name')
+        if not tag_name:
+            raise Exception("Tag name is required.")
 
-        tag_names = [tag['TagName'] for tag in tags_response]
-
-        data = {}
-        for tag in tags_response:
-            try:
-                response = c.read(tag['TagName'])
-                if response['Status'] == 'Success':
-                    data[tag['TagName']] = response['Value']
-                    print("Read from PLC: Key: {tag['TagName']}, Value: {response['Value']}")
-                else:
-                    print("Failed to read tag: {tag['TagName']}, Status: {response['Status']}")
-            except Exception as e:
-                print("Error reading value: {tag['TagName']}: {e}")
-
-        return jsonify({"tags": tag_names, "data": data}), 200
+        try:
+            tag_name = tag_name.encode('utf-8')
+            read_value = c.read_string(tag_name)
+            print("Read from PLC: Tag: {tag_name.decode('utf-8')}, Value: {read_value}")
+            return jsonify({"data": {tag_name.decode('utf-8'): read_value}, "error": None}), 200
+        except Exception as e:
+            print("Error reading string: {tag_name.decode('utf-8')}: {e}")
+            return jsonify({"message": "Error occurred while reading data from PLC.", "error": str(e)}), 500
     except Exception as e:
         print("Error:", e)
         return jsonify({"message": "Error occurred while reading data from PLC.", "error": str(e)}), 500
