@@ -19,7 +19,7 @@ def insert_data_to_plc():
 
     try:
         if not is_connected:  # Check if connection needs to be established
-            c.open('192.168.12.5')  # Open connection to the PLC (only once)
+            c.open('10.60.85.21')  # Open connection to the PLC (only once)
             print("Connection to PLC established.")
             is_connected = True
 

@@ -1,0 +1,1 @@
+call python g2.py
